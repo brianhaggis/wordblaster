@@ -30,7 +30,7 @@ def tier_for_len(n: int):
     return str(n) if n in (5, 6, 7, 8) else None
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "secret"
+app.config["SECRET_KEY"] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 lock = Lock()
 
@@ -104,7 +104,7 @@ def clear_result_after_delay():
     emit_state()
 
 @app.route("/")
-def index(): return render_template("index.html")
+def index(): return render_template("index.html", dict_size=len(words))
 
 @app.route("/admin")
 def admin(): return render_template("admin.html")
