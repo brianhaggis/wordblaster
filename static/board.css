@@ -1,0 +1,382 @@
+/* /static/board.css */
+/* --- DYNAMIC DANGER LIGHTING (BACKGROUNDS) --- */
+body {
+  background-color: #050505;
+  color: #e5d5ac;
+  overflow: hidden;
+  font-family: 'Josefin Slab', serif;
+  transition: background-image 2s ease;
+  user-select: none; -webkit-user-select: none;
+}
+
+/* State 1: IDLE / RESULTS (Deep Sea Blue) */
+body.bg-idle { background-image: radial-gradient(circle at center, #1a3c40 0%, #050505 100%); }
+/* State 2: ACTIVE (Furnace Gold) */
+body.bg-active { background-image: radial-gradient(circle at center, #5e4b1f 0%, #1a1505 100%); }
+/* State 3: PANIC (Alarm Red) */
+body.bg-panic { background-image: radial-gradient(circle at center, #5e0b0b 0%, #1a0505 100%); animation: panicPulse 0.5s infinite alternate; }
+@keyframes panicPulse { from { filter: brightness(1); } to { filter: brightness(1.3); } }
+
+/* State 4: SCANNING (Teal Pulse) */
+body.bg-scanning { 
+  background-image: radial-gradient(circle at center, #1a3c40 0%, #050505 100%); 
+  animation: scanningPulse 1s infinite alternate; 
+}
+@keyframes scanningPulse { from { filter: brightness(1); } to { filter: brightness(1.5); } }
+
+/* --- COMMON UI --- */
+.crt-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 999;
+  background:
+    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+    linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  background-size: 100% 4px, 6px 100%;
+  animation: flicker 0.15s infinite;
+  opacity: 0.6;
+}
+@keyframes flicker { 0% { opacity: 0.55; } 5% { opacity: 0.6; } 10% { opacity: 0.55; } 100% { opacity: 0.55; } }
+.neon-gold { text-shadow: 0 0 5px var(--deco-gold), 0 0 10px var(--deco-brass); color: var(--deco-cream); }
+
+/* --- THE HAGGIS ART --- */
+.haggis-art {
+  width: 100px; height: 70px; background: #8b5a2b; border-radius: 50% 50% 40% 40%;
+  border: 3px solid #000; position: relative; box-shadow: inset -5px -5px 0 rgba(0,0,0,0.2);
+  transition: transform 0.3s, background 0.3s; margin: 0 auto;
+}
+
+/* Eyes container - using a pseudo element we can animate */
+.haggis-art::before { 
+  content: ""; 
+  position: absolute; 
+  top: 18px; 
+  left: 32px; 
+  width: 8px; 
+  height: 8px; 
+  background: #000; 
+  border-radius: 50%;
+  box-shadow: 28px 0 0 #000; /* Second eye */
+}
+
+/* Feet */
+.haggis-art::after { 
+  content: ""; 
+  position: absolute; 
+  bottom: -8px; 
+  left: 20px; 
+  width: 8px; 
+  height: 8px; 
+  background: #000; 
+  box-shadow: 40px 0 0 #000; 
+}
+
+/* REACTIVE ANIMATIONS */
+
+/* IDLE - Breathing, occasional blink, rare spin */
+.haggis-art.idle { 
+  animation: idleBreathing 3s infinite ease-in-out, idleSpin 25s infinite ease-in-out;
+}
+
+.haggis-art.idle::before {
+  animation: idleBlink 5s infinite;
+}
+
+@keyframes idleBreathing { 
+  0%, 100% { transform: scale(1); } 
+  50% { transform: scale(1.03, 0.97); } 
+}
+
+@keyframes idleBlink {
+  0%, 4%, 8%, 100% { height: 8px; top: 18px; }
+  5%, 7% { height: 2px; top: 21px; } /* Quick blink */
+}
+
+@keyframes idleSpin {
+  0%, 90%, 100% { transform: scale(1) rotate(0deg); }
+  92% { transform: scale(1.05, 0.95) rotate(0deg); }
+  95% { transform: scale(1) rotate(180deg); }
+  97% { transform: scale(1) rotate(360deg); }
+}
+
+/* SLEEP - gentle breathing */
+.haggis-art.sleep { animation: sleepAnim 2s infinite ease-in-out; }
+@keyframes sleepAnim { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05, 0.95); } }
+
+/* RUN - bouncy running */
+.haggis-art.run { animation: runAnim 0.2s infinite alternate; }
+@keyframes runAnim { from { transform: rotate(-5deg) translateY(0); } to { transform: rotate(5deg) translateY(-5px); } }
+
+/* PANIC - shaking and red */
+.haggis-art.panic { animation: panicShake 0.1s infinite; background: #a04040; }
+@keyframes panicShake { 0% { transform: translate(0, 0); } 25% { transform: translate(-2px, 2px); } 50% { transform: translate(2px, -2px); } 75% { transform: translate(-2px, -2px); } }
+
+/* DEAD */
+.haggis-art.dead { transform: rotate(180deg); filter: grayscale(100%); animation: deadBounce 0.8s infinite ease-in-out; }
+@keyframes deadBounce { 0%, 100% { transform: rotate(180deg) translateY(0); } 50% { transform: rotate(180deg) translateY(-10px); } }
+
+/* CELEBRATE - Happy bounce and spin */
+.haggis-art.celebrate { 
+  animation: celebrateBounce 0.4s ease-out 4;
+  background: #9b6a3b; /* Slightly brighter/happier color */
+}
+
+@keyframes celebrateBounce {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  30% { transform: translateY(-20px) rotate(-10deg) scale(1.1, 0.9); }
+  50% { transform: translateY(-25px) rotate(10deg) scale(0.9, 1.1); }
+  70% { transform: translateY(-15px) rotate(-5deg) scale(1.05); }
+}
+
+/* SCANNING - Eyes moving back and forth */
+.haggis-art.scanning {
+  animation: scanningBody 1.5s infinite ease-in-out;
+}
+
+.haggis-art.scanning::before {
+  animation: scanningEyes 0.6s infinite ease-in-out;
+}
+
+@keyframes scanningBody {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes scanningEyes {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* --- INTRO SCREEN --- */
+#attract-screen {
+  position: fixed; inset: 0; z-index: 2000;
+  background: radial-gradient(circle at center, #1a0f0f 0%, #000 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: transform 1.2s cubic-bezier(0.7, 0, 0.3, 1);
+}
+#attract-screen.dismissed { transform: translateY(-100%); pointer-events: none; }
+
+/* Enhanced press-start button with intense glow */
+.press-start {
+  font-family: 'VT323', monospace; 
+  font-size: 2.5rem; 
+  color: #fff; 
+  margin-top: 10px; 
+  cursor: pointer;
+  background: rgba(255,255,255,0.1); 
+  padding: 15px 40px; 
+  border: 3px solid #fff;
+  animation: buttonPulseGlow 1.5s ease-in-out infinite;
+  text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #fff;
+  box-shadow: 0 0 20px rgba(255,255,255,0.5), inset 0 0 20px rgba(255,255,255,0.1);
+}
+
+@keyframes buttonPulseGlow {
+  0%, 100% { 
+    text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #fff;
+    box-shadow: 0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.2), inset 0 0 20px rgba(255,255,255,0.1);
+    transform: scale(1);
+    border-color: #fff;
+  }
+  50% { 
+    text-shadow: 0 0 20px #fff, 0 0 40px #ffd700, 0 0 60px #ffd700, 0 0 80px #ffd700;
+    box-shadow: 0 0 40px rgba(255,215,0,0.8), 0 0 80px rgba(255,215,0,0.4), inset 0 0 30px rgba(255,215,0,0.2);
+    transform: scale(1.05);
+    border-color: #ffd700;
+  }
+}
+
+/* Haggis on intro screen - idle animation */
+#attract-screen .haggis-art {
+  animation: idleBreathing 3s infinite ease-in-out;
+}
+
+#attract-screen .haggis-art::before {
+  animation: idleBlink 5s infinite;
+}
+
+/* --- FLOATING PARTICLES --- */
+#particles-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: radial-gradient(circle, rgba(238,187,85,0.8) 0%, rgba(238,187,85,0) 70%);
+  border-radius: 50%;
+}
+
+.particle.type-a { animation: particleFloatA 12s infinite ease-in-out; }
+.particle.type-b { animation: particleFloatB 15s infinite ease-in-out; }
+.particle.type-c { animation: particleFloatC 10s infinite ease-in-out; }
+
+@keyframes particleFloatA {
+  0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+  10% { opacity: 0.6; }
+  50% { transform: translateY(50vh) translateX(30px); opacity: 0.4; }
+  90% { opacity: 0.2; }
+  100% { transform: translateY(-10vh) translateX(-20px); opacity: 0; }
+}
+
+@keyframes particleFloatB {
+  0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+  15% { opacity: 0.5; }
+  50% { transform: translateY(40vh) translateX(-40px); opacity: 0.3; }
+  85% { opacity: 0.1; }
+  100% { transform: translateY(-10vh) translateX(25px); opacity: 0; }
+}
+
+@keyframes particleFloatC {
+  0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+  5% { opacity: 0.7; }
+  50% { transform: translateY(60vh) translateX(15px); opacity: 0.5; }
+  95% { opacity: 0.15; }
+  100% { transform: translateY(-10vh) translateX(-10px); opacity: 0; }
+}
+
+/* --- READY SCREEN (GREEN) --- */
+#ready-screen {
+  position: fixed; inset: 0; z-index: 800; background-color: #008800;
+  background-image: radial-gradient(circle, #00ff00 0%, #004400 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 50px;
+  transform: translateY(-100%); transition: transform 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045);
+}
+#ready-screen.visible { transform: translateY(0); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.ready-text { font-family: 'Rye', serif; color: #000; font-size: 5rem; text-align: center; line-height: 1.1; text-transform: uppercase; text-shadow: 2px 2px 0px rgba(0,0,0,0.2); }
+#ready-score-box {
+  background-color: #000; color: #00ff00; padding: 20px 30px; border: 8px double #00ff00;
+  text-align: center; box-shadow: 20px 20px 0px rgba(0,0,0,0.5); min-width: 50%; max-width: 95vw; transform: rotate(-2deg);
+}
+.rs-title { font-family: 'Josefin Slab', sans-serif; font-size: 2rem; letter-spacing: 4px; border-bottom: 2px solid #00ff00; margin-bottom: 20px; display: inline-block; }
+.rs-values { 
+  font-family: 'Courier New', monospace; 
+  font-size: clamp(1.2rem, 3.5vw, 2rem);
+  font-weight: bold; 
+  text-transform: uppercase; 
+  text-shadow: 0 0 10px #00ff00;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  max-width: 90%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  text-align: center;
+}
+
+.ready-instruction {
+  font-family: 'Courier New', monospace; font-size: 1.5rem; color: #00ff00;
+  text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px #00ff00;
+  margin-top: 10px; animation: pixelBlink 1s steps(2, start) infinite;
+}
+
+@keyframes pixelBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* --- SUSPENSE SCREEN --- */
+#suspense-screen {
+    position: fixed; inset: 0; z-index: 3000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transform: translateY(-100%);
+    transition: transform 0.5s ease, background-color 0.2s ease;
+    background-color: #001133; 
+}
+#suspense-screen.visible { transform: translateY(0); }
+
+#suspense-screen.blue { 
+    background-color: #002266; 
+    background-image: radial-gradient(circle, #0044aa 0%, #001133 100%); 
+    animation: suspensePulse 1s infinite alternate;
+}
+#suspense-screen.green { 
+    background-color: #004400; 
+    background-image: radial-gradient(circle, #00aa00 0%, #002200 100%); 
+    animation: suspensePulse 0.5s infinite alternate;
+}
+#suspense-screen.red { 
+    background-color: #440000; 
+    background-image: radial-gradient(circle, #aa0000 0%, #220000 100%); 
+    animation: suspensePulse 0.2s infinite alternate;
+}
+
+@keyframes suspensePulse { from { filter: brightness(1); } to { filter: brightness(1.3); } }
+
+.suspense-word {
+    font-family: 'Rye', serif; font-size: 8rem; color: #fff;
+    text-align: center; text-transform: uppercase;
+    text-shadow: 4px 4px 0px #000;
+    margin-bottom: 20px;
+}
+.suspense-points {
+    font-family: 'Black Ops One', cursive; font-size: 12rem; color: #ffd700;
+    text-shadow: 0 0 30px #ffd700, 5px 5px 0 #000;
+    animation: pulsePoints 0.5s infinite alternate;
+}
+@keyframes pulsePoints { from { transform: scale(1); } to { transform: scale(1.1); } }
+
+
+/* --- RUBBER STAMP RESULTS --- */
+.stamp-container {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-10deg) scale(2);
+  opacity: 0; pointer-events: none; z-index: 100;
+  border: 10px solid; padding: 20px 50px; text-transform: uppercase;
+  font-family: Impact, 'Arial Black', 'Bebas Neue', sans-serif; 
+  font-size: 4rem; 
+  letter-spacing: 3px;
+  font-weight: 900;
+  text-align: center; mix-blend-mode: hard-light;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.stamp-container.stamp-valid { color: #00ff00; border-color: #00ff00; text-shadow: 0 0 20px #00ff00; }
+.stamp-container.stamp-invalid { color: #ff0000; border-color: #ff0000; text-shadow: 0 0 20px #ff0000; }
+.stamp-container.slammed { opacity: 0.9; transform: translate(-50%, -50%) rotate(-5deg) scale(1); }
+
+/* --- SCANNING TEXT FX --- */
+.scan-char { 
+  display: inline-block; 
+  color: var(--deco-cream); 
+  animation: scanWave 1s infinite linear; 
+}
+@keyframes scanWave {
+  0% { color: #1a3c40; text-shadow: none; transform: scale(1); }
+  25% { color: #00ffff; text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff; transform: scale(1.2); }
+  50% { color: #1a3c40; text-shadow: none; transform: scale(1); }
+  100% { color: #1a3c40; text-shadow: none; transform: scale(1); }
+}
+
+/* Layout */
+#mascot-container { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10; }
+.team-block { opacity: 0.3; transition: 0.5s; transform: scale(0.9); filter: grayscale(100%); }
+.team-block.active { opacity: 1; transform: scale(1.1); filter: grayscale(0%); }
+#scoreA, #scoreB { font-variant-numeric: tabular-nums; }
+#conn-dot { position: fixed; bottom: 10px; right: 10px; width: 12px; height: 12px; border-radius: 50%; background: #330000; border: 1px solid #550000; z-index: 1000; box-shadow: 0 0 5px red; }
+#conn-dot.online { background: #00ff00; box-shadow: 0 0 8px #00ff00; border-color: #004400; }
+#signal-flash { position: fixed; top: 10px; right: 10px; width: 20px; height: 20px; background: #00ff00; border-radius: 50%; opacity: 0; pointer-events: none; z-index: 9999; box-shadow: 0 0 10px #00ff00; }
+#signal-flash.flash { animation: flashAnim 0.2s linear; }
+@keyframes flashAnim { 0% { opacity: 1; transform: scale(1.5); } 100% { opacity: 0; transform: scale(1); } }
+
+/* Titles */
+.logo-group { text-align: center; margin-bottom: 40px; transform: rotate(-3deg); }
+.camp-title { font-family: 'VT323'; font-size: 2rem; color: #aaa; letter-spacing: 5px; line-height: 0.8; }
+.blaster-title { font-family: 'Rye'; font-size: 5rem; color: var(--deco-gold); text-shadow: 3px 3px 0 #000; line-height: 0.9; }
+.badge { margin: 20px auto; transform: scale(1.5); }
+
+/* GAME OVER BANNER STYLE */
+.game-over-banner {
+    background-color: var(--deco-gold);
+    color: #000;
+    font-family: 'Black Ops One', cursive;
+    font-size: clamp(1.5rem, 5vw, 3rem);
+    padding: 10px 30px;
+    margin-bottom: 30px;
+    border: 4px solid #fff;
+    box-shadow: 0 0 20px var(--deco-gold);
+    text-transform: uppercase;
+    transform: rotate(-2deg);
+    text-align: center;
+    max-width: 90vw;
+}

@@ -1,0 +1,214 @@
+
+
+:root {
+  /* Palette: Rapture Art Deco */
+  --deco-gold:   #eebb55;
+  --deco-brass:  #b8860b;
+  --deco-dark:   #121010;
+  --deco-teal:   #0f2b2d;
+  --deco-red:    #750b0b;
+  --deco-cream:  #f2e6d6;
+  --glass-bg:    rgba(20, 10, 5, 0.9);
+  
+  /* Map original colors to Theme */
+  --teamA: #2eea6f; /* Keep original team green for logic, or map to Teal? */
+  --teamB: #ff8a2a; /* Keep original team orange */
+}
+
+/* --- GLOBAL LAYOUT --- */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background-color: var(--deco-dark);
+  /* Moody underwater/industrial gradient */
+  background-image: radial-gradient(circle at center, #1a3c40 0%, #050505 100%);
+  color: var(--deco-cream);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont,
+               "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 20px;
+  min-height: 100vh;
+}
+
+/* Film Grain Overlay */
+body::before {
+  content: "";
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E");
+  opacity: 0.3; pointer-events: none; z-index: 999;
+}
+
+/* Vignette */
+body::after {
+  content: "";
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  box-shadow: inset 0 0 150px rgba(0,0,0,0.9);
+  pointer-events: none; z-index: 998;
+}
+
+.container, .wrap {
+  max-width: 860px; margin: 0 auto; padding: 28px 16px;
+  position: relative; z-index: 10;
+}
+
+/* --- TYPOGRAPHY --- */
+h1, h2, h3 {
+  font-family: 'Rye', serif;
+  font-weight: 400;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--deco-gold);
+  text-shadow: 2px 2px 0px #000;
+  margin: 0 0 15px 0;
+  border-bottom: 2px solid var(--deco-brass);
+  display: inline-block;
+}
+
+.tagline, p, li {
+  font-family: 'Josefin Slab', serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+}
+
+/* --- CARDS & CONTAINERS --- */
+.card, .rulebox, .video-box {
+  background: var(--glass-bg) !important;
+  /* Double Border Look */
+  border: 3px solid var(--deco-brass) !important;
+  outline: 2px solid var(--deco-gold);
+  outline-offset: -8px;
+  border-radius: 4px !important; /* Slight rounding only */
+  padding: 26px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  position: relative;
+  margin-bottom: 24px;
+}
+
+/* Decorative corner screws */
+.card::after, .rulebox::after {
+  content: "⊕"; position: absolute; top: 5px; right: 5px;
+  color: var(--deco-brass); font-size: 20px; font-family: sans-serif;
+}
+.card::before, .rulebox::before {
+  content: "⊕"; position: absolute; top: 5px; left: 5px;
+  color: var(--deco-brass); font-size: 20px; font-family: sans-serif;
+}
+
+/* --- BUTTONS (Standard) --- */
+.btn {
+  background: linear-gradient(180deg, var(--deco-gold) 0%, var(--deco-brass) 100%);
+  color: #2b1d0e !important;
+  font-family: 'Rye', serif;
+  font-size: 1.1rem;
+  padding: 12px 20px;
+  border: 2px solid #5c4002;
+  border-radius: 4px;
+  text-decoration: none;
+  display: inline-block;
+  cursor: pointer;
+  text-transform: uppercase;
+  box-shadow: 0 4px 0 #3e2b02, 0 5px 10px rgba(0,0,0,0.5);
+  transition: transform 0.1s;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  margin: 5px;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #3e2b02;
+}
+.btn.secondary {
+  background: linear-gradient(180deg, #555 0%, #333 100%);
+  color: #ccc !important;
+  border-color: #222;
+  box-shadow: 0 4px 0 #111;
+  text-shadow: none;
+}
+
+/* --- BIG RED BUTTON (Scoreboard) --- */
+.bigbtn {
+  width: 100%; height: 100%; min-height: 120px;
+  background: radial-gradient(circle, #8a0303 0%, #520000 100%) !important;
+  color: var(--deco-cream) !important;
+  border: 6px solid var(--deco-brass) !important;
+  outline: 2px solid #000;
+  font-family: 'Rye', serif !important;
+  font-size: 42px;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 30px #000, 0 10px 20px rgba(0,0,0,0.8) !important;
+  text-shadow: 2px 2px 4px #000;
+  border-radius: 8px !important;
+}
+.bigbtn:active { transform: scale(0.98); }
+
+/* --- INPUTS --- */
+input[type="text"] {
+  background: #000;
+  border: 2px solid var(--deco-brass);
+  color: var(--deco-gold);
+  font-family: 'Josefin Slab', serif;
+  font-size: 1.3rem;
+  padding: 10px;
+}
+
+/* --- SCANNER SPECIFIC --- */
+.banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 15px;
+  background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(117, 11, 11, 0.4) 50%, rgba(0,0,0,0) 100%);
+  border-top: 1px solid var(--deco-red);
+  border-bottom: 1px solid var(--deco-red);
+  margin-bottom: 15px;
+  border-radius: 0 !important;
+}
+.pill {
+  font-family: 'Rye', serif;
+  background: var(--deco-red);
+  color: var(--deco-cream) !important;
+  padding: 5px 15px;
+  border: 2px solid #330000;
+  box-shadow: 0 0 10px var(--deco-red);
+  border-radius: 4px;
+}
+/* Team specific pill tweaks can stay standard or override here */
+
+/* --- SCOREBOARD TEXT --- */
+#score {
+  font-family: 'Rye', serif;
+  color: var(--deco-cream);
+  text-shadow: 3px 3px 0 var(--deco-brass), 6px 6px 0 #000;
+}
+.msg {
+  font-family: 'Josefin Slab', serif;
+  font-size: 1.5rem;
+  border-top: 1px solid var(--deco-brass);
+  border-bottom: 1px solid var(--deco-brass);
+  padding: 5px 0;
+  display: inline-block;
+  width: 100%;
+}
+.status.ok { color: var(--deco-gold); }
+.status.err { color: var(--deco-red); }
+.status.dupe { color: #cc8800; }
+
+/* --- UTILS --- */
+.actions { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 560px) { .actions { grid-template-columns: 1fr 1fr; } }
+.foot { margin-top: 20px; font-size: 0.9rem; opacity: 0.6; text-align: center; }
+
+/* ===========================================
+   SCANNER PAGE OVERRIDES
+   Disables decorative overlays that interfere with camera view
+   =========================================== */
+body.scanner-view {
+  background: #000 !important;
+  background-image: none !important;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+body.scanner-view::before,
+body.scanner-view::after {
+  display: none !important;
+}

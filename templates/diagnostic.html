@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Network Diagnostic - Word Blaster</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 { color: #ffd700; border-bottom: 2px solid #0f0; }
+        .section {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .status { font-size: 1.2em; margin: 10px 0; }
+        .ok { color: #0f0; }
+        .error { color: #f00; }
+        .warning { color: #ff0; }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-family: monospace;
+            font-size: 1em;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0ff; }
+        #log {
+            background: #000;
+            border: 1px solid #333;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 NETWORK DIAGNOSTIC</h1>
+    
+    <div class="section">
+        <h2>Device Information</h2>
+        <div id="deviceInfo"></div>
+    </div>
+
+    <div class="section">
+        <h2>Connection Tests</h2>
+        <div class="status">Server: <span id="serverStatus">Testing...</span></div>
+        <div class="status">WebSocket: <span id="wsStatus">Testing...</span></div>
+        <div class="status">Camera: <span id="cameraStatus">Testing...</span></div>
+        <button onclick="runTests()">Re-run Tests</button>
+    </div>
+
+    <div class="section">
+        <h2>Diagnostic Log</h2>
+        <div id="log"></div>
+    </div>
+
+    <div class="section">
+        <h2>Quick Links</h2>
+        <button onclick="window.location.href='/scan'">Scanner Page</button>
+        <button onclick="window.location.href='/board'">Scoreboard</button>
+        <button onclick="window.location.href='/admin'">Admin Panel</button>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        const log = document.getElementById('log');
+        
+        function addLog(msg, type = 'info') {
+            const line = document.createElement('div');
+            line.style.color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#fff';
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            log.appendChild(line);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Display device info
+        const deviceInfo = document.getElementById('deviceInfo');
+        deviceInfo.innerHTML = `
+            <p><strong>User Agent:</strong> ${navigator.userAgent}</p>
+            <p><strong>Platform:</strong> ${navigator.platform}</p>
+            <p><strong>Screen:</strong> ${window.screen.width}x${window.screen.height}</p>
+            <p><strong>Window:</strong> ${window.innerWidth}x${window.innerHeight}</p>
+            <p><strong>Location:</strong> ${window.location.href}</p>
+            <p><strong>Protocol:</strong> ${window.location.protocol}</p>
+        `;
+
+        async function testServer() {
+            const status = document.getElementById('serverStatus');
+            try {
+                addLog('Testing HTTP connection...');
+                const response = await fetch('/');
+                if (response.ok) {
+                    status.innerHTML = '<span class="ok">✓ Connected</span>';
+                    addLog('Server connection: OK', 'success');
+                    return true;
+                } else {
+                    status.innerHTML = '<span class="error">✗ HTTP Error ' + response.status + '</span>';
+                    addLog('Server returned error: ' + response.status, 'error');
+                    return false;
+                }
+            } catch (err) {
+                status.innerHTML = '<span class="error">✗ ' + err.message + '</span>';
+                addLog('Server connection failed: ' + err.message, 'error');
+                return false;
+            }
+        }
+
+        async function testWebSocket() {
+            const status = document.getElementById('wsStatus');
+            return new Promise((resolve) => {
+                try {
+                    addLog('Testing WebSocket connection...');
+                    const socket = io();
+                    
+                    const timeout = setTimeout(() => {
+                        socket.close();
+                        status.innerHTML = '<span class="error">✗ Timeout</span>';
+                        addLog('WebSocket timeout', 'error');
+                        resolve(false);
+                    }, 5000);
+
+                    socket.on('connect', () => {
+                        clearTimeout(timeout);
+                        status.innerHTML = '<span class="ok">✓ Connected</span>';
+                        addLog('WebSocket connection: OK', 'success');
+                        socket.close();
+                        resolve(true);
+                    });
+
+                    socket.on('connect_error', (err) => {
+                        clearTimeout(timeout);
+                        status.innerHTML = '<span class="error">✗ ' + err.message + '</span>';
+                        addLog('WebSocket error: ' + err.message, 'error');
+                        resolve(false);
+                    });
+                } catch (err) {
+                    status.innerHTML = '<span class="error">✗ ' + err.message + '</span>';
+                    addLog('WebSocket test failed: ' + err.message, 'error');
+                    resolve(false);
+                }
+            });
+        }
+
+        async function testCamera() {
+            const status = document.getElementById('cameraStatus');
+            try {
+                addLog('Testing camera access...');
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                stream.getTracks().forEach(track => track.stop());
+                status.innerHTML = '<span class="ok">✓ Available</span>';
+                addLog('Camera access: OK', 'success');
+                return true;
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    status.innerHTML = '<span class="warning">⚠ Permission Denied</span>';
+                    addLog('Camera permission denied by user', 'error');
+                } else if (err.name === 'NotFoundError') {
+                    status.innerHTML = '<span class="error">✗ No Camera Found</span>';
+                    addLog('No camera device found', 'error');
+                } else {
+                    status.innerHTML = '<span class="error">✗ ' + err.name + '</span>';
+                    addLog('Camera error: ' + err.message, 'error');
+                }
+                return false;
+            }
+        }
+
+        async function runTests() {
+            addLog('=== Starting Diagnostics ===');
+            await testServer();
+            await testWebSocket();
+            await testCamera();
+            addLog('=== Diagnostics Complete ===');
+        }
+
+        // Run tests on load
+        window.addEventListener('DOMContentLoaded', () => {
+            addLog('Diagnostic page loaded');
+            runTests();
+        });
+    </script>
+</body>
+</html>

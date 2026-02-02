@@ -1,0 +1,833 @@
+<!doctype html>
+
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Scanner Eye - Word Blaster</title>
+  <link rel="stylesheet" href="/static/main.css"/>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #camera-container {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #video {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #overlay {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    #flash {
+      position: fixed;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 50;
+      transition: opacity 0.15s ease-out;
+    }
+    #flash.active {
+      opacity: 1;
+      transition: none;
+    }
+
+    /* Compact status bar */
+    #status-bar {
+      position: fixed;
+      bottom: 5px;
+      left: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid var(--deco-brass);
+      border-radius: 6px;
+      padding: 6px 12px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    #status-text {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+    }
+
+    #status-main {
+      font-family: 'Rye', serif;
+      font-size: 1.2rem;
+      color: var(--deco-cream);
+      letter-spacing: 2px;
+    }
+
+    #status-sub {
+      font-family: 'Courier New', monospace;
+      font-size: 0.65rem;
+      color: var(--deco-gold);
+      text-transform: uppercase;
+    }
+
+    #letter-display {
+      display: flex;
+      gap: 3px;
+    }
+
+    .letter-slot {
+      width: 28px;
+      height: 32px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--deco-brass);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Rye', serif;
+      font-size: 1.1rem;
+      color: var(--deco-cream);
+    }
+
+    .letter-slot.detected {
+      background: rgba(0, 100, 0, 0.6);
+      border-color: #00ff00;
+      color: #00ff00;
+    }
+
+    .letter-slot.empty {
+      opacity: 0.3;
+    }
+
+    #test-btn {
+      background: linear-gradient(180deg, #8a0303 0%, #520000 100%);
+      border: 2px solid var(--deco-brass);
+      border-radius: 4px;
+      color: var(--deco-cream);
+      font-family: 'Rye', serif;
+      font-size: 0.8rem;
+      padding: 8px 12px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    #test-btn:active {
+      transform: scale(0.95);
+    }
+
+    #test-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #info-bar {
+      position: fixed;
+      top: 5px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      padding: 5px;
+    }
+
+    #connection-status {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff0000;
+      box-shadow: 0 0 8px #ff0000;
+    }
+
+    #connection-status.online {
+      background: #00ff00;
+      box-shadow: 0 0 8px #00ff00;
+    }
+
+    #phase-display {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: var(--deco-gold);
+      text-transform: uppercase;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 5px 10px;
+      border-radius: 4px;
+    }
+
+    #mode-toggle {
+      font-family: 'Courier New', monospace;
+      font-size: 0.7rem;
+      color: var(--deco-cream);
+      background: rgba(50, 50, 50, 0.8);
+      border: 1px solid var(--deco-brass);
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    #mode-toggle.reversed {
+      background: rgba(100, 50, 0, 0.8);
+      border-color: #ffa500;
+      color: #ffa500;
+    }
+
+    /* Simple framing guide */
+    #frame-guide {
+      position: fixed;
+      left: 5%;
+      width: 90%;
+      top: 25%;
+      height: 50%;
+      border: 3px solid rgba(0, 255, 0, 0.6);
+      border-radius: 8px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    #frame-guide::before {
+      content: 'FRAME LETTERS HERE';
+      position: absolute;
+      top: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #0f0;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      text-shadow: 0 0 4px #000;
+    }
+
+    /* Result overlay */
+    #result-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    #result-overlay.visible { opacity: 1; }
+    #result-overlay.success { background: rgba(0, 80, 0, 0.9); }
+    #result-overlay.failure { background: rgba(80, 0, 0, 0.9); }
+
+    #result-word {
+      font-family: 'Rye', serif;
+      font-size: 4rem;
+      color: white;
+      letter-spacing: 8px;
+    }
+
+    #result-message {
+      font-family: 'Courier New', monospace;
+      font-size: 1.5rem;
+      color: white;
+      margin-top: 20px;
+      text-transform: uppercase;
+    }
+
+    #result-points {
+      font-family: 'Rye', serif;
+      font-size: 3rem;
+      color: var(--deco-gold);
+      margin-top: 10px;
+    }
+
+    /* Loading indicator */
+    #loading-indicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.9);
+      padding: 20px 40px;
+      border-radius: 8px;
+      border: 2px solid var(--deco-gold);
+      z-index: 300;
+      display: none;
+    }
+
+    #loading-indicator.visible {
+      display: block;
+    }
+
+    #loading-text {
+      font-family: 'Courier New', monospace;
+      color: var(--deco-gold);
+      font-size: 1rem;
+    }
+
+    /* Debug panel */
+    #debug-panel {
+      position: fixed;
+      top: 40px;
+      right: 5px;
+      background: rgba(0,0,0,0.8);
+      color: #0f0;
+      font-family: monospace;
+      font-size: 10px;
+      padding: 5px;
+      border-radius: 4px;
+      z-index: 150;
+      max-width: 150px;
+      display: none;
+    }
+    #debug-panel.visible { display: block; }
+  </style>
+
+</head>
+
+<body class="scanner-view">
+  <div id="flash"></div>
+
+  <div id="camera-container">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="frame-guide"></div>
+
+  <div id="info-bar">
+    <div id="connection-status"></div>
+    <div id="phase-display">OFFLINE</div>
+    <div id="zoom-control" style="display:none;">
+      <input type="range" id="zoom-slider" min="1" max="4" step="0.1" value="1" style="width:60px; vertical-align:middle;">
+      <span id="zoom-value" style="font-size:0.7rem; color:var(--deco-cream);">1x</span>
+    </div>
+    <button id="mode-toggle">L→R</button>
+  </div>
+
+  <div id="debug-panel">
+    <div id="debug-res">Res: --</div>
+    <div id="debug-conf">Conf: --</div>
+    <div id="debug-raw">Raw: --</div>
+  </div>
+
+  <div id="loading-indicator">
+    <div id="loading-text">Loading OCR engine...</div>
+  </div>
+
+  <div id="status-bar">
+    <div id="status-text">
+      <div id="status-main">LOADING OCR</div>
+      <div id="status-sub">Please wait...</div>
+    </div>
+    <div id="letter-display">
+      <div class="letter-slot empty">-</div>
+      <div class="letter-slot empty">-</div>
+      <div class="letter-slot empty">-</div>
+      <div class="letter-slot empty">-</div>
+      <div class="letter-slot empty">-</div>
+      <div class="letter-slot empty">-</div>
+      <div class="letter-slot empty">-</div>
+      <div class="letter-slot empty">-</div>
+    </div>
+    <button id="test-btn" disabled>SCAN</button>
+  </div>
+
+  <div id="result-overlay">
+    <div id="result-word"></div>
+    <div id="result-message"></div>
+    <div id="result-points"></div>
+  </div>
+
+  <script>
+    // ===========================================
+    // CONFIGURATION
+    // ===========================================
+    const CONFIG = {
+      reverseOrder: false,  // false = LÃ¢â€ â€™R (front of stand - PRODUCTION), true = RÃ¢â€ ÂL (behind stand)
+      numSlots: 8,
+      minLetters: 5,
+      resultDisplayTime: 3000,
+      debug: true
+    };
+
+    // ===========================================
+    // DOM ELEMENTS
+    // ===========================================
+    const els = {
+      video: document.getElementById('video'),
+      overlay: document.getElementById('overlay'),
+      flash: document.getElementById('flash'),
+      statusMain: document.getElementById('status-main'),
+      statusSub: document.getElementById('status-sub'),
+      letterDisplay: document.getElementById('letter-display'),
+      connectionStatus: document.getElementById('connection-status'),
+      phaseDisplay: document.getElementById('phase-display'),
+      zoomControl: document.getElementById('zoom-control'),
+      zoomSlider: document.getElementById('zoom-slider'),
+      zoomValue: document.getElementById('zoom-value'),
+      modeToggle: document.getElementById('mode-toggle'),
+      testBtn: document.getElementById('test-btn'),
+      resultOverlay: document.getElementById('result-overlay'),
+      resultWord: document.getElementById('result-word'),
+      resultMessage: document.getElementById('result-message'),
+      resultPoints: document.getElementById('result-points'),
+      loadingIndicator: document.getElementById('loading-indicator'),
+      loadingText: document.getElementById('loading-text'),
+      debugPanel: document.getElementById('debug-panel'),
+      debugRes: document.getElementById('debug-res'),
+      debugConf: document.getElementById('debug-conf'),
+      debugRaw: document.getElementById('debug-raw')
+    };
+
+    const ctx = els.overlay.getContext('2d', { willReadFrequently: true });
+
+    // Hidden canvas for OCR processing
+    const processCanvas = document.createElement('canvas');
+    const processCtx = processCanvas.getContext('2d', { willReadFrequently: true });
+
+    // ===========================================
+    // STATE
+    // ===========================================
+    let state = {
+      cameraReady: false,
+      isProcessing: false,
+      currentPhase: 'offline',
+      videoTrack: null,
+      zoomSupported: false,
+      zoomMin: 1,
+      zoomMax: 1
+    };
+
+    if (CONFIG.debug) {
+      els.debugPanel.classList.add('visible');
+    }
+
+    // ===========================================
+    // AUDIO
+    // ===========================================
+    function playTone(type, freq, duration) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.value = 0.15;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        setTimeout(() => { osc.stop(); audioCtx.close(); }, duration);
+      } catch (e) {}
+    }
+
+    function soundSuccess() {
+      playTone('sine', 880, 100);
+      setTimeout(() => playTone('sine', 1175, 150), 100);
+    }
+
+    function soundFailure() {
+      playTone('square', 200, 300);
+    }
+
+    function soundShutter() {
+      playTone('sawtooth', 800, 30);
+      setTimeout(() => playTone('sawtooth', 600, 30), 30);
+    }
+
+    // ===========================================
+    // INITIALIZATION (No Tesseract - using Claude Vision)
+    // ===========================================
+    function initOCR() {
+      els.loadingIndicator.classList.remove('visible');
+      els.testBtn.disabled = false;
+      updateStatus('READY', 'Claude Vision ready');
+      console.log('Scanner ready (Claude Vision mode)');
+    }
+
+    // ===========================================
+    // CAMERA INITIALIZATION
+    // ===========================================
+    async function initCamera() {
+      updateStatus('STARTING', 'Requesting camera...');
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { exact: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        });
+
+        els.video.srcObject = stream;
+        
+        await new Promise((resolve, reject) => {
+          els.video.onloadedmetadata = resolve;
+          els.video.onerror = reject;
+          setTimeout(() => reject(new Error('Timeout')), 10000);
+        });
+
+        await els.video.play();
+        
+        const w = els.video.videoWidth;
+        const h = els.video.videoHeight;
+        
+        els.overlay.width = w;
+        els.overlay.height = h;
+        
+        state.cameraReady = true;
+        
+        // Check for native zoom support
+        const track = stream.getVideoTracks()[0];
+        state.videoTrack = track;
+        const capabilities = track.getCapabilities();
+        
+        if (capabilities.zoom) {
+          state.zoomSupported = true;
+          state.zoomMin = capabilities.zoom.min;
+          state.zoomMax = capabilities.zoom.max;
+          
+          els.zoomSlider.min = state.zoomMin;
+          els.zoomSlider.max = Math.min(state.zoomMax, 5); // Cap at 5x
+          els.zoomSlider.value = state.zoomMin;
+          els.zoomControl.style.display = 'flex';
+          els.zoomControl.style.alignItems = 'center';
+          els.zoomControl.style.gap = '5px';
+          
+          console.log(`Zoom: ${state.zoomMin}x - ${state.zoomMax}x`);
+        }
+        
+        if (CONFIG.debug) {
+          els.debugRes.textContent = `Res: ${w}x${h}`;
+        }
+        
+        console.log(`Camera: ${w}x${h}`);
+        
+      } catch (err) {
+        console.error('Camera failed:', err);
+        
+        // Fallback
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: false
+          });
+          els.video.srcObject = stream;
+          await els.video.play();
+          state.cameraReady = true;
+        } catch (err2) {
+          updateStatus('ERROR', 'Camera failed');
+        }
+      }
+    }
+
+    // ===========================================
+    // OCR SCANNING - CLAUDE VISION
+    // ===========================================
+    async function captureAndScan() {
+      if (!state.cameraReady || state.isProcessing) {
+        console.warn('Scan blocked');
+        return;
+      }
+
+      state.isProcessing = true;
+      els.testBtn.disabled = true;
+      
+      soundShutter();
+      els.flash.classList.add('active');
+      setTimeout(() => els.flash.classList.remove('active'), 100);
+      
+      updateStatus('SCANNING', 'Sending to Claude Vision...');
+
+      const w = els.video.videoWidth;
+      const h = els.video.videoHeight;
+      
+      // Capture full frame to canvas
+      processCanvas.width = w;
+      processCanvas.height = h;
+      processCtx.drawImage(els.video, 0, 0, w, h);
+      
+      // Convert to base64 JPEG
+      const imageData = processCanvas.toDataURL('image/jpeg', 0.8);
+
+      try {
+        updateStatus('SCANNING', 'Claude is reading...');
+        
+        const response = await fetch('/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: imageData })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        let letters = data.letters || '';
+        const rawResponse = data.raw || '';
+        
+        console.log(`Claude OCR (raw): "${letters}"`);
+        
+        // REVERSE THE STRING if in production mode (shooting from behind)
+        // Claude extracts what it sees, so "GNITSET" needs to become "TESTING"
+        if (CONFIG.reverseOrder && letters.length > 0) {
+          letters = letters.split('').reverse().join('');
+          console.log(`Claude OCR (reversed): "${letters}"`);
+        }
+        
+        if (CONFIG.debug) {
+          els.debugConf.textContent = `Len: ${letters.length}`;
+          els.debugRaw.textContent = `Raw: ${rawResponse}`;
+        }
+
+        // Build slots array from letters (for display)
+        const slots = new Array(CONFIG.numSlots).fill(null);
+        for (let i = 0; i < letters.length && i < CONFIG.numSlots; i++) {
+          slots[i] = letters[i];
+        }
+
+        const foundCount = slots.filter(s => s !== null).length;
+        
+        updateLetterDisplay(slots);
+        
+        // The word to submit is just the letters joined (already reversed if needed)
+        const word = letters;
+        
+        if (word.length >= CONFIG.minLetters) {
+          updateStatus(word, `${foundCount} letters detected`);
+          await submitWord(word);
+        } else {
+          updateStatus(word || 'NO DATA', `Only ${foundCount} letters found`);
+          soundFailure();
+          socket.emit('scan_timeout');
+          setTimeout(() => resetScanState(), CONFIG.resultDisplayTime);
+        }
+        
+      } catch (err) {
+        console.error('OCR error:', err);
+        updateStatus('ERROR', err.message);
+        soundFailure();
+        socket.emit('scan_timeout');
+        setTimeout(() => resetScanState(), CONFIG.resultDisplayTime);
+      }
+    }
+
+    // ===========================================
+    // SUBMISSION
+    // ===========================================
+    async function submitWord(word) {
+      updateStatus(word, 'Submitting...');
+      
+      try {
+        const response = await fetch('/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: word })
+        });
+        
+        const data = await response.json();
+        
+        if (data.valid) {
+          showResult(word, true, `+${data.points} POINTS`, '');
+          soundSuccess();
+          socket.emit('scan_complete');
+        } else {
+          showResult(word, false, data.reason.toUpperCase().replace(/_/g, ' '), '');
+          soundFailure();
+          socket.emit('scan_complete');
+        }
+        
+      } catch (err) {
+        console.error('Submit failed:', err);
+        showResult(word, false, 'NETWORK ERROR', '');
+        soundFailure();
+        socket.emit('scan_timeout');
+      }
+      
+      setTimeout(() => resetScanState(), CONFIG.resultDisplayTime);
+    }
+
+    // ===========================================
+    // UI
+    // ===========================================
+    function updateStatus(main, sub) {
+      els.statusMain.textContent = main;
+      els.statusSub.textContent = sub;
+    }
+
+    function updateLetterDisplay(letters) {
+      const slots = els.letterDisplay.querySelectorAll('.letter-slot');
+      
+      slots.forEach((slot, i) => {
+        const letter = letters[i];
+        slot.textContent = letter || '-';
+        slot.classList.toggle('detected', letter !== null);
+        slot.classList.toggle('empty', letter === null);
+      });
+    }
+
+    function showResult(word, success, message, points) {
+      els.resultWord.textContent = word;
+      els.resultMessage.textContent = message;
+      els.resultPoints.textContent = points;
+      
+      els.resultOverlay.classList.remove('success', 'failure');
+      els.resultOverlay.classList.add(success ? 'success' : 'failure');
+      els.resultOverlay.classList.add('visible');
+    }
+
+    function hideResult() {
+      els.resultOverlay.classList.remove('visible');
+    }
+
+    function resetScanState() {
+      state.isProcessing = false;
+      els.testBtn.disabled = false;
+      
+      hideResult();
+      updateLetterDisplay(new Array(CONFIG.numSlots).fill(null));
+      ctx.clearRect(0, 0, els.overlay.width, els.overlay.height);
+      
+      updateStatus('READY', 'Awaiting scan');
+      
+      if (CONFIG.debug) {
+        els.debugConf.textContent = 'Conf: --';
+        els.debugRaw.textContent = 'Raw: --';
+      }
+    }
+
+    // ===========================================
+    // SOCKET.IO
+    // ===========================================
+    const socket = io({
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+      timeout: 20000
+    });
+
+    socket.on('connect', () => {
+      console.log('Socket.IO connected');
+      els.connectionStatus.classList.add('online');
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket.IO connection error:', error);
+      els.phaseDisplay.textContent = 'CONN ERROR';
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Socket.IO disconnected');
+      els.connectionStatus.classList.remove('online');
+      els.phaseDisplay.textContent = 'OFFLINE';
+    });
+
+    socket.on('game_state', (gameState) => {
+      state.currentPhase = gameState.phase;
+      els.phaseDisplay.textContent = gameState.phase.toUpperCase();
+      
+      if ((gameState.phase === 'intro' || gameState.phase === 'idle') && !state.isProcessing) {
+        resetScanState();
+      }
+    });
+
+    socket.on('snapshot', () => {
+      console.log('Snapshot triggered');
+      captureAndScan();
+    });
+
+    // ===========================================
+    // CONTROLS
+    // ===========================================
+    els.modeToggle.addEventListener('click', () => {
+      CONFIG.reverseOrder = !CONFIG.reverseOrder;
+      els.modeToggle.textContent = CONFIG.reverseOrder ? 'R→L' : 'L→R';
+      els.modeToggle.classList.toggle('reversed', CONFIG.reverseOrder);
+      console.log(`Mode: ${CONFIG.reverseOrder ? 'REVERSED (production)' : 'NORMAL (testing)'}`);
+    });
+
+    els.zoomSlider.addEventListener('input', async () => {
+      if (!state.zoomSupported || !state.videoTrack) return;
+      
+      const zoomLevel = parseFloat(els.zoomSlider.value);
+      els.zoomValue.textContent = zoomLevel.toFixed(1) + 'x';
+      
+      try {
+        await state.videoTrack.applyConstraints({ advanced: [{ zoom: zoomLevel }] });
+      } catch (e) {
+        console.warn('Zoom failed:', e);
+      }
+    });
+
+    els.testBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      captureAndScan();
+    });
+
+    // Triple-tap to toggle debug
+    let tapCount = 0;
+    let tapTimer = null;
+    document.body.addEventListener('click', () => {
+      tapCount++;
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(() => {
+        if (tapCount >= 3) {
+          CONFIG.debug = !CONFIG.debug;
+          els.debugPanel.classList.toggle('visible', CONFIG.debug);
+        }
+        tapCount = 0;
+      }, 400);
+    });
+
+    // ===========================================
+    // INIT
+    // ===========================================
+    async function init() {
+      await initCamera();
+      initOCR();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    // Prevent zoom
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) e.preventDefault();
+      lastTouchEnd = now;
+    }, { passive: false });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <head>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Camp Haggis Word Blaster">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Camp Haggis Word Blaster - Entrance</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rye&family=Josefin+Slab:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/main.css"/>
+  </head>
+  <body class="home">
+    <div class="container" style="text-align:center;">
+      <header class="hero">
+        <h1 style="font-size: 3rem; margin-bottom: 5px;">Camp Haggis Word Blaster</h1>
+        <p class="tagline">"Vigor for the Mind. Power for the People."</p>
+      </header>
+
+      <main class="card" style="margin-top: 30px;">
+        <h2 style="font-size: 1.5rem; color: var(--deco-brass); border:none; margin-bottom:20px;">SELECT YOUR STATION</h2>
+
+        <div class="actions" style="display:flex; flex-direction:column; gap:20px; align-items:center;">
+          <a class="btn" style="width:100%; max-width:400px;" href="/scan">
+            <span style="display:block; font-size:1.5rem;">The Scanner</span>
+            <span style="font-size:0.9rem; opacity:0.7; font-family:'Josefin Slab'; text-transform:none;">(Optic Sensor Module)</span>
+          </a>
+
+          <a class="btn secondary" style="width:100%; max-width:400px;" href="/board">
+            <span style="display:block; font-size:1.5rem;">The Scoreboard</span>
+            <span style="font-size:0.9rem; opacity:0.7; font-family:'Josefin Slab'; text-transform:none;">(The Main Stage)</span>
+          </a>
+        </div>
+
+        <div class="rulebox" style="text-align:left; margin-top:30px;">
+          <h2 style="font-size:1.2rem; color: var(--deco-gold);">Payout Schedule</h2>
+          <ul class="rules" style="list-style-type:square; color:var(--deco-cream);">
+            <li>5-letter Formula = <b>3</b> points</li>
+            <li>6-letter Formula = <b>5</b> points</li>
+            <li>7-letter Formula = <b>8</b> points</li>
+            <li>8-letter Formula = <b>13</b> points</li>
+            <li style="opacity:0.6; margin-top:5px;"><i>(Samples under 5 letters are discarded)</i></li>
+          </ul>
+        </div>
+      </main>
+
+      <footer class="foot">
+        <p>System Status: Dictionary Loaded ({{ dict_size }} entries)</p>
+      </footer>
+    </div>
+  </body>
+</html>

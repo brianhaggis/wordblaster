@@ -1,0 +1,737 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Scoreboard - Word Blaster</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rye&family=Josefin+Slab:wght@400;700&family=VT323&family=Black+Ops+One&family=Roboto+Mono&family=Bebas+Neue&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/main.css"/>
+    <link rel="stylesheet" href="/static/board.css"/>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>    
+    <style>
+      /* Extra Styles for Bonus/Game Over */
+      #winner-screen, #game-over-screen {
+         position: fixed; inset: 0; background: #000; z-index: 1500;
+         display: flex; flex-direction: column; align-items: center; justify-content: center;
+         transform: translateY(-100%); transition: transform 0.5s ease;
+      }
+      #winner-screen.visible, #game-over-screen.visible { transform: translateY(0); }
+
+      .win-title { 
+        text-align:center; 
+        margin-bottom:20px; 
+        padding:0 20px; 
+      }
+      
+      .winner-name-glow {
+        font-family:'Josefin Slab', serif; 
+        font-weight:700; 
+        font-size:clamp(2.5rem, 8vw, 5rem); 
+        color:#fff;
+        text-transform:uppercase; 
+        letter-spacing:3px;
+        text-shadow: 
+          0 0 10px var(--deco-gold),
+          0 0 20px var(--deco-gold),
+          0 0 40px var(--deco-gold),
+          0 0 80px #ff8c00;
+        animation: winnerDance 0.5s ease-in-out infinite alternate, winnerGlow 1.5s ease-in-out infinite;
+      }
+      
+      .win-word {
+        font-family:'Rye', serif;
+        font-size:clamp(3rem, 10vw, 7rem);
+        color:var(--deco-gold);
+        text-shadow: 4px 4px 0 #000;
+        letter-spacing: 8px;
+        margin-top: -10px;
+      }
+      
+      @keyframes winnerDance {
+        0% { transform: scale(1) rotate(-1deg); }
+        100% { transform: scale(1.05) rotate(1deg); }
+      }
+      
+      @keyframes winnerGlow {
+        0%, 100% { 
+          text-shadow: 
+            0 0 10px var(--deco-gold),
+            0 0 20px var(--deco-gold),
+            0 0 40px var(--deco-gold),
+            0 0 80px #ff8c00;
+        }
+        50% { 
+          text-shadow: 
+            0 0 20px #fff,
+            0 0 40px var(--deco-gold),
+            0 0 60px var(--deco-gold),
+            0 0 100px #ff8c00,
+            0 0 120px #ff4500;
+        }
+      }
+      .win-sub { font-family:'VT323'; font-size:2.5rem; color:#fff; letter-spacing:4px; text-align:center; max-width:80%; }
+      
+      .game-over-banner {
+          background-color: var(--deco-gold);
+          color: #000;
+          font-family: 'Bebas Neue', Impact, Arial Black, sans-serif;
+          font-size: clamp(1.8rem, 5vw, 3.5rem);
+          font-weight: 400;
+          padding: 15px 25px;
+          margin-bottom: 30px;
+          border: 4px solid #fff;
+          box-shadow: 0 0 20px var(--deco-gold);
+          text-transform: uppercase;
+          transform: rotate(-2deg);
+          text-align: center;
+          max-width: 90vw;
+          line-height: 1.2;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          letter-spacing: 2px;
+      }
+
+      .final-score-row { display:flex; gap:30px; margin-top:20px; flex-wrap:wrap; justify-content:center; }
+      .final-card { text-align:center; border:2px solid #333; padding:20px 20px; background:rgba(255,255,255,0.05); min-width:140px; max-width:45vw; }
+      .final-val { font-family:'Rye'; font-size:clamp(3rem, 10vw, 6rem); color:white; }
+
+
+
+      .score-highlight {
+          color: #ffd700 !important;
+          text-shadow: 0 0 20px #ffd700;
+          transform: scale(1.2);
+          transition: all 0.3s ease;
+      }
+    </style>
+  </head>
+
+  <body class="bg-idle">
+    <div id="sfx" style="display:none;">
+      <audio id="sfx-intro" src="/static/sfx/intro.mp3" loop></audio>
+      <audio id="sfx-greenscreen" src="/static/sfx/greenscreen.mp3" loop></audio>
+      <audio id="sfx-getready" src="/static/sfx/get ready.mp3"></audio>
+      <audio id="sfx-tick" src="/static/sfx/tick.mp3"></audio>
+      <audio id="sfx-warning" src="/static/sfx/warning.mp3"></audio> 
+      <audio id="sfx-scan" src="/static/sfx/scanning.mp3" loop></audio>
+      <audio id="sfx-success" src="/static/sfx/word accepted.mp3"></audio>
+      <audio id="sfx-fail" src="/static/sfx/fail.mp3"></audio>
+      <audio id="sfx-timeout" src="/static/sfx/scan failed.mp3"></audio>
+      <audio id="sfx-bonustier" src="/static/sfx/8%20letter%20word.mp3"></audio>
+      <audio id="sfx-fanfare" src="/static/sfx/fanfare.mp3" loop></audio>
+      <audio id="sfx-outro" src="/static/sfx/outro.mp3" loop></audio>
+      <audio id="sfx-bonusloop" src="/static/sfx/bonus_loop.mp3" loop></audio>
+      <audio id="sfx-bonuswarn" src="/static/sfx/warning_music.mp3"></audio>
+      <audio id="sfx-pneumatic" src="/static/sfx/pneumatic.mp3"></audio>
+      <audio id="sfx-stamp" src="/static/sfx/stamp.mp3"></audio>
+      <audio id="sfx-buzzer" src="/static/sfx/buzzer.mp3"></audio>
+      <audio id="sfx-drumroll" src="/static/sfx/drumroll.mp3"></audio>
+    </div>
+
+    <div id="particles-container"></div>
+    <div class="crt-overlay"></div>
+    <div id="conn-dot"></div>
+    <div id="signal-flash"></div>
+
+    <div id="attract-screen">
+      <div class="logo-group">
+        <div class="camp-title">Camp<br>Haggis</div>
+        <div class="badge"><div class="haggis-art idle"></div></div>
+        <div class="blaster-title">WORD BLASTER</div>
+      </div>
+      <div class="press-start" id="init-btn" style="cursor:pointer;">TAP TO ENABLE AUDIO</div>
+    </div>
+
+    <div id="winner-screen">
+       <div id="win-msg" class="win-title">
+         <div id="win-team-name" class="winner-name-glow">TEAM A</div>
+         <div class="win-word">WIN!</div>
+       </div>
+       <div class="win-sub">GET READY FOR THE BONUS ROUND - ALL POINT LEVELS INCREASED!</div>
+    </div>
+
+    <div id="suspense-screen">
+        <div id="suspense-word" class="suspense-word">WORD</div>
+        <div id="suspense-points" class="suspense-points" style="display:none;">+20</div>
+    </div>
+
+    <div id="game-over-screen">
+       <div class="camp-title">GAME OVER</div>
+       <div id="final-winner-banner" class="game-over-banner">WINNER: TEAM A</div>
+       <div class="final-score-row">
+           <div class="final-card">
+               <div id="final-lbl-A" style="color:var(--deco-gold); font-family:'Josefin Slab', serif; font-weight:700; font-size:clamp(0.9rem, 2.5vw, 1.3rem); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:uppercase; letter-spacing:0.5px;">TEAM A</div>
+               <div id="final-A" class="final-val">0</div>
+           </div>
+           <div class="final-card">
+               <div id="final-lbl-B" style="color:var(--deco-gold); font-family:'Josefin Slab', serif; font-weight:700; font-size:clamp(0.9rem, 2.5vw, 1.3rem); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:uppercase; letter-spacing:0.5px;">TEAM B</div>
+               <div id="final-B" class="final-val">0</div>
+           </div>
+       </div>
+    </div>
+
+    <div id="ready-screen">
+      <div id="readyMsg" class="ready-text">GET READY</div>
+      <div id="ready-score-box">
+        <div class="rs-title">CURRENT SCORES</div>
+        <div class="rs-values">
+          <span><span id="rs-teamA">TEAM A</span>: <span id="rs-scoreA">0</span></span>
+          <span><span id="rs-teamB">TEAM B</span>: <span id="rs-scoreB">0</span></span>
+        </div>
+      </div>
+      <div class="ready-instruction">PRESS BUTTON TO START TURN!</div>
+    </div>
+
+    <div id="rubber-stamp" class="stamp-container">APPROVED</div>
+
+    <div class="wrap" style="height:100vh; display:flex; flex-direction:column;">
+      <div id="mascot-container"><div id="game-mascot" class="haggis-art idle"></div></div>
+      
+      <div class="card" style="margin-top:60px; border:none; background:transparent;">
+        <div style="display:flex; justify-content:space-around; padding:0 20px; align-items:center;">
+          <div id="blockA" class="team-block" style="text-align:center;">
+            <div id="labelA" style="font-family:'Josefin Slab', serif; font-weight:700; font-size:clamp(1rem, 3vw, 1.8rem); color:var(--deco-gold); max-width:40vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:uppercase; letter-spacing:0.5px;">Team A</div>
+            <div id="scoreA" class="neon-gold" style="font-size:5rem; font-family:'Courier New', monospace;">0</div>
+          </div>
+          <div style="font-family:'Rye'; opacity:0.3; font-size:2rem;">VS</div>
+          <div id="blockB" class="team-block" style="text-align:center;">
+            <div id="labelB" style="font-family:'Josefin Slab', serif; font-weight:700; font-size:clamp(1rem, 3vw, 1.8rem); color:var(--deco-gold); max-width:40vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:uppercase; letter-spacing:0.5px;">Team B</div>
+            <div id="scoreB" class="neon-gold" style="font-size:5rem; font-family:'Courier New', monospace;">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <div id="mainMsg" style="font-size:5rem; font-family:'Rye'; color:#fff;">WAITING</div>
+        <div id="subMsg" style="margin-top:20px; font-size:1.5rem; font-family:'Courier New'; color:var(--deco-cream);">SYSTEM IDLE</div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const socket = io({
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionAttempts: 10,
+          timeout: 20000
+        });
+        
+        const el = {
+            attract: document.getElementById('attract-screen'),
+            ready: document.getElementById('ready-screen'),
+            winner: document.getElementById('winner-screen'),
+            gameOver: document.getElementById('game-over-screen'),
+            finalBanner: document.getElementById('final-winner-banner'),
+            suspense: document.getElementById('suspense-screen'),
+            suspenseWord: document.getElementById('suspense-word'),
+            suspensePoints: document.getElementById('suspense-points'),
+            readyMsg: document.getElementById('readyMsg'),
+            stamp: document.getElementById('rubber-stamp'),
+            mainMsg: document.getElementById('mainMsg'),
+            subMsg: document.getElementById('subMsg'),
+            scoreA: document.getElementById('scoreA'),
+            scoreB: document.getElementById('scoreB'),
+            rsScoreA: document.getElementById('rs-scoreA'),
+            rsScoreB: document.getElementById('rs-scoreB'),
+            labelA: document.getElementById('labelA'),
+            labelB: document.getElementById('labelB'),
+            rsTeamA: document.getElementById('rs-teamA'),
+            rsTeamB: document.getElementById('rs-teamB'),
+            blockA: document.getElementById('blockA'),
+            blockB: document.getElementById('blockB'),
+            mascot: document.getElementById('game-mascot'),
+            initBtn: document.getElementById('init-btn'),
+            flash: document.getElementById('signal-flash'),
+            winMsg: document.getElementById('win-msg'),
+            winTeamName: document.getElementById('win-team-name'),
+            finalA: document.getElementById('final-A'),
+            finalB: document.getElementById('final-B'),
+            finalLblA: document.getElementById('final-lbl-A'), 
+            finalLblB: document.getElementById('final-lbl-B'),
+            particlesContainer: document.getElementById('particles-container')
+        };
+
+        const sfx = {
+          intro: document.getElementById('sfx-intro'),
+          greenscreen: document.getElementById('sfx-greenscreen'),
+          getready: document.getElementById('sfx-getready'),
+          tick: document.getElementById('sfx-tick'),
+          warning: document.getElementById('sfx-warning'),
+          scan: document.getElementById('sfx-scan'),
+          success: document.getElementById('sfx-success'),
+          fail: document.getElementById('sfx-fail'),
+          scan_timeout: document.getElementById('sfx-timeout'),
+          bonustier: document.getElementById('sfx-bonustier'),
+          fanfare: document.getElementById('sfx-fanfare'),
+          outro: document.getElementById('sfx-outro'),
+          bonusloop: document.getElementById('sfx-bonusloop'),
+          bonuswarn: document.getElementById('sfx-bonuswarn'),
+          pneumatic: document.getElementById('sfx-pneumatic'),
+          stamp: document.getElementById('sfx-stamp'),
+          buzzer: document.getElementById('sfx-buzzer'),
+          drumroll: document.getElementById('sfx-drumroll')
+        };
+        
+        // ===========================================
+        // FLOATING PARTICLES
+        // ===========================================
+        function createParticles() {
+            const types = ['type-a', 'type-b', 'type-c'];
+            for (let i = 0; i < 15; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle ' + types[i % 3];
+                particle.style.left = (Math.random() * 100) + '%';
+                particle.style.animationDelay = (Math.random() * 10) + 's';
+                particle.style.opacity = 0;
+                el.particlesContainer.appendChild(particle);
+            }
+        }
+        createParticles();
+
+        // ===========================================
+        // AUDIO FUNCTIONS
+        // ===========================================
+        
+        function playExclusive(key, loop=false){ 
+            Object.values(sfx).forEach(audio => {
+                if(audio) { audio.pause(); audio.currentTime = 0; }
+            });
+            if(sfx[key]){ 
+                sfx[key].loop = loop; 
+                sfx[key].play().catch(()=>{}); 
+            }
+        }
+
+        function playOverlay(key) {
+            if(sfx[key]) {
+                sfx[key].currentTime = 0;
+                sfx[key].play().catch(()=>{});
+            }
+        }
+
+        function playClick() {
+            const click = sfx.pneumatic.cloneNode();
+            click.volume = 0.6;
+            click.addEventListener('ended', () => { click.remove(); });
+            click.play().catch(()=>{});
+        }
+        
+        // iOS Audio Unlock using Web Audio API
+        let audioContext = null;
+        let audioUnlocked = false;
+        
+        function unlockIOSAudio() {
+            if (audioUnlocked) return;
+            
+            console.log('ðŸ”Š Unlocking iOS audio...');
+            
+            // Create and unlock Web Audio API context
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Resume context (required on iOS)
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                
+                // Play silent buffer to unlock
+                const buffer = audioContext.createBuffer(1, 1, 22050);
+                const source = audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioContext.destination);
+                source.start(0);
+                
+                console.log('âœ“ Web Audio API unlocked');
+            } catch (e) {
+                console.warn('Web Audio API unlock failed:', e);
+            }
+            
+            // Prime all HTML5 audio elements
+            let unlocked = 0;
+            Object.entries(sfx).forEach(([key, audio]) => {
+                if (audio) {
+                    try {
+                        audio.load();
+                        audio.volume = 1.0;
+                        audio.muted = false;
+                        
+                        // Actually play briefly (iOS needs to hear it)
+                        audio.play().then(() => {
+                            setTimeout(() => {
+                                audio.pause();
+                                audio.currentTime = 0;
+                            }, 50); // Let it play 50ms
+                            unlocked++;
+                            console.log(`âœ“ ${key}`);
+                        }).catch(err => {
+                            console.warn(`âœ— ${key}:`, err.message);
+                        });
+                    } catch (e) {
+                        console.warn(`Error with ${key}:`, e);
+                    }
+                }
+            });
+            
+            audioUnlocked = true;
+            console.log(`ðŸ”Š Unlocked ${unlocked} audio files`);
+        }
+        
+        el.initBtn.onclick = function() {
+            // Unlock audio FIRST (must be in click handler)
+            unlockIOSAudio();
+            
+            el.initBtn.textContent = "AUDIO ENABLED - READY";
+            el.initBtn.style.background = "#00ff00"; 
+            el.initBtn.style.color = "#000";
+            
+            // Wait for unlock to complete, then play intro
+            setTimeout(() => {
+                playExclusive('intro', true);
+            }, 300);
+        };
+
+        function animateScoreRollup(pointsToAdd, team = null) {
+            let isTeamA;
+            if (team) {
+                isTeamA = (team === 'A');
+            } else {
+                isTeamA = el.blockA.classList.contains('active');
+            }
+            const scoreEl = isTeamA ? el.scoreA : el.scoreB;
+            
+            let finalScore = parseInt(scoreEl.textContent);
+            let startScore = finalScore - pointsToAdd;
+            if(startScore < 0) startScore = 0;
+            
+            scoreEl.textContent = startScore;
+            const speed = pointsToAdd > 10 ? 100 : 150;
+            
+            let pointsCounted = 0;
+            const rollInterval = setInterval(() => {
+                pointsCounted++;
+                scoreEl.textContent = startScore + pointsCounted;
+                playClick(); 
+                if(pointsCounted >= pointsToAdd) {
+                    clearInterval(rollInterval);
+                    scoreEl.classList.add('score-highlight');
+                    setTimeout(() => scoreEl.classList.remove('score-highlight'), 1000);
+                }
+            }, speed);
+        }
+
+        function triggerCelebration() {
+            el.mascot.className = 'haggis-art celebrate';
+            setTimeout(() => {
+                if (!el.mascot.classList.contains('run') && 
+                    !el.mascot.classList.contains('panic') &&
+                    !el.mascot.classList.contains('scanning')) {
+                    el.mascot.className = 'haggis-art idle';
+                }
+            }, 1800);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            el.flash.classList.add('flash'); 
+            setTimeout(()=> el.flash.classList.remove('flash'), 100);
+            
+            if (['active', 'countdown', 'bonus_active', 'bonus_countdown'].includes(currentPhase)) {
+                socket.emit('trigger_snapshot');
+            } else if (['intro', 'idle', 'bonus_intro'].includes(currentPhase)) {
+                if(e.code === 'Space' || e.key === 'Enter') {
+                    socket.emit('game_trigger');
+                }
+            }
+        });
+
+        let currentPhase = 'intro';
+        let timerInterval = null;
+        let countdownInterval = null;
+        let bonusSequenceTriggered = false;
+        let lastProcessedResultId = 0;
+        let lastAudioTriggerPhase = null;
+
+        socket.on('game_state', (state) => {
+            updateScores(state);
+            updateVisuals(state);
+            currentPhase = state.phase;
+        });
+
+        function updateScores(s) {
+            if(!s) return;
+            
+            const isAnimating = document.querySelector('.score-highlight');
+            if(!isAnimating) {
+                el.scoreA.textContent = s.teamA.score; 
+                el.scoreB.textContent = s.teamB.score;
+            }
+            
+            el.rsScoreA.textContent = s.teamA.score; 
+            el.rsScoreB.textContent = s.teamB.score;
+            el.finalA.textContent = s.teamA.score; 
+            el.finalB.textContent = s.teamB.score;
+            
+            el.labelA.textContent = s.teamA.name; 
+            el.labelB.textContent = s.teamB.name;
+            el.rsTeamA.textContent = s.teamA.name; 
+            el.rsTeamB.textContent = s.teamB.name;
+            el.finalLblA.textContent = s.teamA.name; 
+            el.finalLblB.textContent = s.teamB.name;
+            
+            if(s.current_team === 'A') { 
+                el.blockA.classList.add('active'); 
+                el.blockB.classList.remove('active'); 
+            } else { 
+                el.blockA.classList.remove('active'); 
+                el.blockB.classList.add('active'); 
+            }
+        }
+
+        function updateVisuals(state) {
+            if(!state.phase.includes('active')) clearInterval(timerInterval);
+            if(!state.phase.includes('countdown')) clearInterval(countdownInterval);
+            
+            el.mainMsg.style.color = "#fff";
+            el.stamp.className = 'stamp-container';
+            
+            if (state.phase === 'bonus_intro' && state.last_result && !bonusSequenceTriggered) {
+                bonusSequenceTriggered = true;
+                runBonusFinale(state.last_result);
+                return;
+            }
+            if (bonusSequenceTriggered && state.phase !== 'game_over') return;
+
+            if(state.phase === 'bonus_intro') {
+                el.ready.classList.remove('visible');
+                el.winner.classList.add('visible');
+                let winName = (state.winning_team === 'A') ? state.teamA.name : state.teamB.name;
+                el.winTeamName.textContent = winName;
+                if(currentPhase !== 'bonus_intro') { 
+                    playExclusive('fanfare', true); 
+                }
+                return;
+            }
+
+            if(state.phase === 'game_over') {
+                el.suspense.classList.remove('visible');
+                if(currentPhase !== 'game_over') {
+                    playExclusive('outro', true);
+                    bonusSequenceTriggered = false;
+                    
+                    let sA = parseInt(state.teamA.score);
+                    let sB = parseInt(state.teamB.score);
+                    let winnerTxt = "DRAW";
+                    if (sA > sB) winnerTxt = "WINNER: " + state.teamA.name.toUpperCase();
+                    else if (sB > sA) winnerTxt = "WINNER: " + state.teamB.name.toUpperCase();
+                    
+                    el.finalBanner.textContent = winnerTxt;
+                }
+                el.winner.classList.remove('visible');
+                el.gameOver.classList.add('visible');
+                return;
+            }
+            
+            el.winner.classList.remove('visible');
+            el.gameOver.classList.remove('visible');
+
+            if (state.phase === 'intro') {
+                el.attract.classList.remove('dismissed'); 
+                el.ready.classList.remove('visible');
+                document.body.className = 'bg-idle';
+                el.mascot.className = 'haggis-art idle';
+                
+                // FULL CLIENT RESET when new game starts
+                bonusSequenceTriggered = false;
+                lastProcessedResultId = 0;
+                lastAudioTriggerPhase = null;
+                clearInterval(timerInterval);
+                clearInterval(countdownInterval);
+                
+                // Restart intro music
+                playExclusive('intro', true);
+            }
+            
+            else if (state.phase === 'idle') {
+                if (state.last_result) {
+                    el.ready.classList.remove('visible'); 
+                    document.body.className = 'bg-idle'; 
+                    
+                    const r = state.last_result;
+                    el.mainMsg.style.fontSize = "6rem"; 
+                    el.mainMsg.textContent = r.word || "FAILED";
+                    
+                    if(r.valid) {
+                        el.subMsg.textContent = `ACCEPTED (+${r.points} PTS)`; 
+                        el.subMsg.style.color = "var(--deco-gold)";
+                        el.stamp.textContent = "APPROVED"; 
+                        el.stamp.classList.add('slammed', 'stamp-valid');
+                    } else {
+                        el.subMsg.textContent = r.reason.replace(/_/g, " ").toUpperCase(); 
+                        el.subMsg.style.color = "var(--deco-red)";
+                        el.stamp.textContent = "REJECTED"; 
+                        el.stamp.classList.add('slammed', 'stamp-invalid');
+                    }
+
+                    if (r.id !== lastProcessedResultId) {
+                        lastProcessedResultId = r.id;
+                        lastAudioTriggerPhase = 'result';
+                        
+                        playOverlay('stamp');
+                        
+                        if(r.valid) {
+                            if(r.len >= 8) playExclusive('bonustier');
+                            else playExclusive('success');
+                            
+                            triggerCelebration();
+                            const scoringTeam = (state.current_team === 'A') ? 'B' : 'A';
+                            animateScoreRollup(r.points, scoringTeam);
+                        } else {
+                            playExclusive('fail');
+                            el.mascot.className = 'haggis-art sleep';
+                        }
+                    }
+
+                } else {
+                    el.attract.classList.add('dismissed'); 
+                    el.ready.classList.add('visible');
+                    el.readyMsg.textContent = "WAITING..."; 
+                    document.body.className = 'bg-idle';
+                    el.mascot.className = 'haggis-art idle';
+
+                    // Play greenscreen music if not already playing
+                    if (lastAudioTriggerPhase !== 'ready') {
+                        lastAudioTriggerPhase = 'ready';
+                        playExclusive('greenscreen', true);
+                    }
+                }
+            }
+            
+            else if (state.phase === 'countdown' || state.phase === 'bonus_countdown') {
+                el.ready.classList.remove('visible'); 
+                el.attract.classList.add('dismissed');
+                document.body.className = 'bg-active';
+                
+                if(!currentPhase.includes('countdown')) {
+                    lastAudioTriggerPhase = 'countdown';
+                    playExclusive('getready');
+                    
+                    let count = 3; 
+                    el.mainMsg.style.fontSize = "12rem"; 
+                    el.mainMsg.textContent = count; 
+                    el.subMsg.textContent = "ROUND STARTING"; 
+                    el.mascot.className = 'haggis-art panic';
+                    
+                    countdownInterval = setInterval(() => { 
+                        count--; 
+                        if(count > 0) el.mainMsg.textContent = count; 
+                    }, 1000);
+                }
+            }
+            
+            else if (state.phase === 'active' || state.phase === 'bonus_active') {
+                el.ready.classList.remove('visible'); 
+                document.body.className = 'bg-active'; 
+                el.mascot.className = 'haggis-art run';
+
+                if(!currentPhase.includes('active')) {
+                    lastAudioTriggerPhase = 'active';
+                    
+                    let time = (state.phase === 'bonus_active') ? 60 : 30; 
+                    el.mainMsg.textContent = time; 
+                    el.mainMsg.style.fontSize = "12rem"; 
+                    el.subMsg.textContent = "CONSTRUCT WORD";
+                    
+                    if(state.phase === 'bonus_active') {
+                        playExclusive('bonusloop', true);
+                    }
+
+                    timerInterval = setInterval(() => {
+                        time--; 
+                        el.mainMsg.textContent = time;
+                        
+                        if(state.phase === 'active') {
+                            if(time > 10) playExclusive('tick');
+                            if(time === 10) {
+                                document.body.className = 'bg-panic'; 
+                                el.mascot.className = 'haggis-art panic'; 
+                                playExclusive('warning'); 
+                                el.mainMsg.style.color = "#ff0000";
+                            }
+                        }
+                        else if(state.phase === 'bonus_active') {
+                            if(time === 10) {
+                                playExclusive('bonuswarn'); 
+                                document.body.className = 'bg-panic'; 
+                                el.mascot.className = 'haggis-art panic'; 
+                                el.mainMsg.style.color = "#ff0000";
+                            }
+                        }
+                    }, 1000);
+                }
+            }
+            
+            else if (state.phase.includes('scanning')) {
+                document.body.className = 'bg-scanning';
+                el.mascot.className = 'haggis-art scanning';
+                
+                const text = "SCANNING"; 
+                let html = "";
+                for(let i=0; i<text.length; i++) {
+                    html += `<span class="scan-char" style="animation-delay:${i*0.1}s">${text[i]}</span>`;
+                }
+                el.mainMsg.innerHTML = html;
+                el.mainMsg.style.color = "var(--deco-gold)"; 
+                el.mainMsg.style.fontSize = "5rem"; 
+                el.subMsg.textContent = "DO NOT MOVE";
+                
+                if(!currentPhase.includes('scanning')) {
+                    lastAudioTriggerPhase = 'scanning';
+                    playExclusive('scan', true);
+                }
+            }
+            
+            else if (state.phase.includes('scan_failed')) {
+                document.body.className = 'bg-panic';
+                el.mascot.className = 'haggis-art panic';
+                el.mainMsg.textContent = "MANUAL ENTRY REQUIRED"; 
+                el.mainMsg.style.color = "#ff0000"; 
+                el.mainMsg.style.fontSize = "4rem";
+                el.subMsg.textContent = "CAMERA ERROR / TIMEOUT";
+                
+                if(!currentPhase.includes('scan_failed')) {
+                    lastAudioTriggerPhase = 'scan_failed';
+                    playExclusive('scan_timeout');
+                }
+            }
+        }
+
+        function runBonusFinale(result) {
+            el.winner.classList.remove('visible');
+            el.suspense.classList.remove('green', 'red');
+            el.suspense.classList.add('blue', 'visible');
+            el.suspenseWord.textContent = result.word || "NO SUBMISSION";
+            el.suspensePoints.style.display = 'none';
+            playExclusive('drumroll');
+
+            setTimeout(() => {
+                el.suspense.classList.remove('blue');
+                if (result.valid) {
+                    el.suspense.classList.add('green');
+                    el.suspensePoints.textContent = "+" + result.points;
+                    el.suspensePoints.style.display = 'block';
+                    playExclusive('bonustier'); 
+                    animateScoreRollup(result.points);
+                } else {
+                    el.suspense.classList.add('red');
+                    playExclusive('fail');
+                }
+            }, 5000);
+        }
+      });
+    </script>
+  </body>
+</html>
