@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Scanner Eye - Word Blaster</title>
+  <link rel="apple-touch-icon" href="/static/icon.png">
   <link rel="stylesheet" href="/static/main.css"/>
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <style>
@@ -352,7 +353,7 @@
       <div class="letter-slot empty">-</div>
       <div class="letter-slot empty">-</div>
     </div>
-    <button id="test-btn" disabled>SCAN</button>
+    <button id="test-btn" disabled>TEST</button>
   </div>
 
   <div id="result-overlay">
@@ -366,11 +367,11 @@
     // CONFIGURATION
     // ===========================================
     const CONFIG = {
-      reverseOrder: false,  // false = LÃ¢â€ â€™R (front of stand - PRODUCTION), true = RÃ¢â€ ÂL (behind stand)
+      reverseOrder: false,  // false = L->R (front of stand - PRODUCTION), true = R->L (behind stand)
       numSlots: 8,
       minLetters: 5,
       resultDisplayTime: 3000,
-      debug: true
+      debug: false  // Triple-tap the screen to show the debug panel
     };
 
     // ===========================================
@@ -414,6 +415,8 @@
     let state = {
       cameraReady: false,
       isProcessing: false,
+      scanToken: 0,
+      lastScanEnd: 0,  // Bumped per scan so a stale delayed reset can't clear a newer scan
       currentPhase: 'offline',
       videoTrack: null,
       zoomSupported: false,
@@ -548,13 +551,16 @@
     // ===========================================
     // OCR SCANNING - CLAUDE VISION
     // ===========================================
-    async function captureAndScan() {
+    // scanId is set for real game scans (from the server); test scans only read the letters
+    async function captureAndScan(scanId = null) {
       if (!state.cameraReady || state.isProcessing) {
         console.warn('Scan blocked');
         return;
       }
 
+      const isTest = scanId === null;
       state.isProcessing = true;
+      const token = ++state.scanToken;
       els.testBtn.disabled = true;
       
       soundShutter();
@@ -619,29 +625,42 @@
         // The word to submit is just the letters joined (already reversed if needed)
         const word = letters;
         
-        if (word.length >= CONFIG.minLetters) {
+        if (isTest) {
+          updateStatus(word || 'NO DATA', `Test only - ${foundCount} letters read, not submitted`);
+          finishScan(token);
+        } else if (word.length >= CONFIG.minLetters) {
           updateStatus(word, `${foundCount} letters detected`);
-          await submitWord(word);
+          await submitWord(word, token);
         } else {
           updateStatus(word || 'NO DATA', `Only ${foundCount} letters found`);
           soundFailure();
-          socket.emit('scan_timeout');
-          setTimeout(() => resetScanState(), CONFIG.resultDisplayTime);
+          socket.emit('scan_timeout', { scan_id: scanId });
+          finishScan(token);
         }
         
       } catch (err) {
         console.error('OCR error:', err);
         updateStatus('ERROR', err.message);
         soundFailure();
-        socket.emit('scan_timeout');
-        setTimeout(() => resetScanState(), CONFIG.resultDisplayTime);
+        if (!isTest) socket.emit('scan_timeout', { scan_id: scanId });
+        finishScan(token);
       }
+    }
+
+    // Free the scanner right away (so a retry can't be blocked), then clear the display later
+    function finishScan(token) {
+      state.isProcessing = false;
+      state.lastScanEnd = Date.now();
+      els.testBtn.disabled = false;
+      setTimeout(() => {
+        if (state.scanToken === token && !state.isProcessing) resetScanState();
+      }, CONFIG.resultDisplayTime);
     }
 
     // ===========================================
     // SUBMISSION
     // ===========================================
-    async function submitWord(word) {
+    async function submitWord(word, token) {
       updateStatus(word, 'Submitting...');
       
       try {
@@ -656,21 +675,19 @@
         if (data.valid) {
           showResult(word, true, `+${data.points} POINTS`, '');
           soundSuccess();
-          socket.emit('scan_complete');
         } else {
-          showResult(word, false, data.reason.toUpperCase().replace(/_/g, ' '), '');
+          showResult(word, false, (data.reason || 'error').toUpperCase().replace(/_/g, ' '), '');
           soundFailure();
-          socket.emit('scan_complete');
         }
         
       } catch (err) {
+        // The server's scan watchdog will flag the failure, so the board still moves on
         console.error('Submit failed:', err);
         showResult(word, false, 'NETWORK ERROR', '');
         soundFailure();
-        socket.emit('scan_timeout');
       }
       
-      setTimeout(() => resetScanState(), CONFIG.resultDisplayTime);
+      finishScan(token);
     }
 
     // ===========================================
@@ -729,7 +746,7 @@
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity,
       timeout: 20000
     });
 
@@ -753,14 +770,15 @@
       state.currentPhase = gameState.phase;
       els.phaseDisplay.textContent = gameState.phase.toUpperCase();
       
-      if ((gameState.phase === 'intro' || gameState.phase === 'idle') && !state.isProcessing) {
+      const showingResult = Date.now() - state.lastScanEnd < CONFIG.resultDisplayTime;
+      if ((gameState.phase === 'intro' || gameState.phase === 'idle') && !state.isProcessing && !showingResult) {
         resetScanState();
       }
     });
 
-    socket.on('snapshot', () => {
+    socket.on('snapshot', (data) => {
       console.log('Snapshot triggered');
-      captureAndScan();
+      captureAndScan((data && data.scan_id) || 0);
     });
 
     // ===========================================

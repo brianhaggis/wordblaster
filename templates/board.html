@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8"/>
     <title>Scoreboard - Word Blaster</title>
+    <link rel="apple-touch-icon" href="/static/icon.png">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,12 +13,12 @@
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>    
     <style>
       /* Extra Styles for Bonus/Game Over */
-      #winner-screen, #game-over-screen {
+      #winner-screen, #tie-screen, #game-over-screen {
          position: fixed; inset: 0; background: #000; z-index: 1500;
          display: flex; flex-direction: column; align-items: center; justify-content: center;
          transform: translateY(-100%); transition: transform 0.5s ease;
       }
-      #winner-screen.visible, #game-over-screen.visible { transform: translateY(0); }
+      #winner-screen.visible, #tie-screen.visible, #game-over-screen.visible { transform: translateY(0); }
 
       .win-title { 
         text-align:center; 
@@ -112,21 +113,19 @@
     <div id="sfx" style="display:none;">
       <audio id="sfx-intro" src="/static/sfx/intro.mp3" loop></audio>
       <audio id="sfx-greenscreen" src="/static/sfx/greenscreen.mp3" loop></audio>
-      <audio id="sfx-getready" src="/static/sfx/get ready.mp3"></audio>
+      <audio id="sfx-getready" src="/static/sfx/get_ready.mp3"></audio>
       <audio id="sfx-tick" src="/static/sfx/tick.mp3"></audio>
       <audio id="sfx-warning" src="/static/sfx/warning.mp3"></audio> 
       <audio id="sfx-scan" src="/static/sfx/scanning.mp3" loop></audio>
-      <audio id="sfx-success" src="/static/sfx/word accepted.mp3"></audio>
+      <audio id="sfx-success" src="/static/sfx/word_accepted.mp3"></audio>
       <audio id="sfx-fail" src="/static/sfx/fail.mp3"></audio>
-      <audio id="sfx-timeout" src="/static/sfx/scan failed.mp3"></audio>
-      <audio id="sfx-bonustier" src="/static/sfx/8%20letter%20word.mp3"></audio>
+      <audio id="sfx-timeout" src="/static/sfx/scan_failed.mp3"></audio>
+      <audio id="sfx-bonustier" src="/static/sfx/8_letter_word.mp3"></audio>
       <audio id="sfx-fanfare" src="/static/sfx/fanfare.mp3" loop></audio>
       <audio id="sfx-outro" src="/static/sfx/outro.mp3" loop></audio>
       <audio id="sfx-bonusloop" src="/static/sfx/bonus_loop.mp3" loop></audio>
-      <audio id="sfx-bonuswarn" src="/static/sfx/warning.mp3"></audio>
       <audio id="sfx-pneumatic" src="/static/sfx/pneumatic.mp3"></audio>
       <audio id="sfx-stamp" src="/static/sfx/stamp.mp3"></audio>
-      <audio id="sfx-buzzer" src="/static/sfx/fail.mp3"></audio>
       <audio id="sfx-drumroll" src="/static/sfx/drumroll.mp3"></audio>
     </div>
 
@@ -150,6 +149,14 @@
          <div class="win-word">WIN!</div>
        </div>
        <div class="win-sub">GET READY FOR THE BONUS ROUND - ALL POINT LEVELS INCREASED!</div>
+    </div>
+
+    <div id="tie-screen">
+       <div class="win-title">
+         <div class="winner-name-glow">DEAD HEAT</div>
+         <div class="win-word">SUDDEN DEATH!</div>
+       </div>
+       <div class="win-sub">ONE MORE WORD EACH - HIGHEST SCORE TAKES THE BONUS ROUND</div>
     </div>
 
     <div id="suspense-screen">
@@ -215,7 +222,7 @@
           transports: ['websocket', 'polling'],
           reconnection: true,
           reconnectionDelay: 1000,
-          reconnectionAttempts: 10,
+          reconnectionAttempts: Infinity,
           timeout: 20000
         });
         
@@ -223,6 +230,7 @@
             attract: document.getElementById('attract-screen'),
             ready: document.getElementById('ready-screen'),
             winner: document.getElementById('winner-screen'),
+            tie: document.getElementById('tie-screen'),
             gameOver: document.getElementById('game-over-screen'),
             finalBanner: document.getElementById('final-winner-banner'),
             suspense: document.getElementById('suspense-screen'),
@@ -268,10 +276,8 @@
           fanfare: document.getElementById('sfx-fanfare'),
           outro: document.getElementById('sfx-outro'),
           bonusloop: document.getElementById('sfx-bonusloop'),
-          bonuswarn: document.getElementById('sfx-bonuswarn'),
           pneumatic: document.getElementById('sfx-pneumatic'),
           stamp: document.getElementById('sfx-stamp'),
-          buzzer: document.getElementById('sfx-buzzer'),
           drumroll: document.getElementById('sfx-drumroll')
         };
         
@@ -326,7 +332,7 @@
         function unlockIOSAudio() {
             if (audioUnlocked) return;
             
-            console.log('ðŸ”Š Unlocking iOS audio...');
+            console.log('Unlocking iOS audio...');
             
             // Create and unlock Web Audio API context
             try {
@@ -346,7 +352,7 @@
                 source.connect(audioContext.destination);
                 source.start(0);
                 
-                console.log('âœ“ Web Audio API unlocked');
+                console.log('Web Audio API unlocked');
             } catch (e) {
                 console.warn('Web Audio API unlock failed:', e);
             }
@@ -367,9 +373,9 @@
                                 audio.currentTime = 0;
                             }, 50); // Let it play 50ms
                             unlocked++;
-                            console.log(`âœ“ ${key}`);
+                            console.log(`OK ${key}`);
                         }).catch(err => {
-                            console.warn(`âœ— ${key}:`, err.message);
+                            console.warn(`FAILED ${key}:`, err.message);
                         });
                     } catch (e) {
                         console.warn(`Error with ${key}:`, e);
@@ -378,7 +384,7 @@
             });
             
             audioUnlocked = true;
-            console.log(`ðŸ”Š Unlocked ${unlocked} audio files`);
+            console.log(`Unlocked ${unlocked} audio files`);
         }
         
         el.initBtn.onclick = function() {
@@ -439,9 +445,10 @@
             el.flash.classList.add('flash'); 
             setTimeout(()=> el.flash.classList.remove('flash'), 100);
             
-            if (['active', 'countdown', 'bonus_active', 'bonus_countdown'].includes(currentPhase)) {
+            // Any key scans during a round, and retries a failed scan (server allows one retry)
+            if (['active', 'countdown', 'bonus_active', 'bonus_countdown', 'scan_failed', 'bonus_scan_failed'].includes(currentPhase)) {
                 socket.emit('trigger_snapshot');
-            } else if (['intro', 'idle', 'bonus_intro'].includes(currentPhase)) {
+            } else if (['intro', 'idle', 'bonus_intro', 'tie'].includes(currentPhase)) {
                 if(e.code === 'Space' || e.key === 'Enter') {
                     socket.emit('game_trigger');
                 }
@@ -454,8 +461,20 @@
         let bonusSequenceTriggered = false;
         let lastProcessedResultId = 0;
         let lastAudioTriggerPhase = null;
+        let clockOffset = 0; // server clock minus this device's clock, in ms
+
+        // Whole seconds left until a server deadline (epoch seconds)
+        function secondsLeft(deadline) {
+            if (!deadline) return 0;
+            const ms = deadline * 1000 - (Date.now() + clockOffset);
+            return Math.max(0, Math.ceil(ms / 1000));
+        }
+
+        function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
+        function stopCountdown() { clearInterval(countdownInterval); countdownInterval = null; }
 
         socket.on('game_state', (state) => {
+            clockOffset = state.server_now * 1000 - Date.now();
             updateScores(state);
             updateVisuals(state);
             currentPhase = state.phase;
@@ -492,8 +511,8 @@
         }
 
         function updateVisuals(state) {
-            if(!state.phase.includes('active')) clearInterval(timerInterval);
-            if(!state.phase.includes('countdown')) clearInterval(countdownInterval);
+            if(!state.phase.includes('active')) stopTimer();
+            if(!state.phase.includes('countdown')) stopCountdown();
             
             el.mainMsg.style.color = "#fff";
             el.stamp.className = 'stamp-container';
@@ -503,7 +522,21 @@
                 runBonusFinale(state.last_result);
                 return;
             }
-            if (bonusSequenceTriggered && state.phase !== 'game_over') return;
+            // Let the finale play out - unless the game ends or a new game starts
+            if (bonusSequenceTriggered && state.phase !== 'game_over' && state.phase !== 'intro') return;
+
+            if (state.phase !== 'tie') el.tie.classList.remove('visible');
+
+            if(state.phase === 'tie') {
+                el.ready.classList.remove('visible');
+                el.winner.classList.remove('visible');
+                el.tie.classList.add('visible');
+                if(currentPhase !== 'tie') {
+                    lastAudioTriggerPhase = 'tie';
+                    playExclusive('drumroll');
+                }
+                return;
+            }
 
             if(state.phase === 'bonus_intro') {
                 el.ready.classList.remove('visible');
@@ -511,6 +544,7 @@
                 let winName = (state.winning_team === 'A') ? state.teamA.name : state.teamB.name;
                 el.winTeamName.textContent = winName;
                 if(currentPhase !== 'bonus_intro') { 
+                    lastAudioTriggerPhase = 'bonus_intro';
                     playExclusive('fanfare', true); 
                 }
                 return;
@@ -519,6 +553,7 @@
             if(state.phase === 'game_over') {
                 el.suspense.classList.remove('visible');
                 if(currentPhase !== 'game_over') {
+                    lastAudioTriggerPhase = 'game_over';
                     playExclusive('outro', true);
                     bonusSequenceTriggered = false;
                     
@@ -541,18 +576,20 @@
             if (state.phase === 'intro') {
                 el.attract.classList.remove('dismissed'); 
                 el.ready.classList.remove('visible');
+                el.suspense.classList.remove('visible');
                 document.body.className = 'bg-idle';
                 el.mascot.className = 'haggis-art idle';
                 
-                // FULL CLIENT RESET when new game starts
-                bonusSequenceTriggered = false;
-                lastProcessedResultId = 0;
-                lastAudioTriggerPhase = null;
-                clearInterval(timerInterval);
-                clearInterval(countdownInterval);
-                
-                // Restart intro music
-                playExclusive('intro', true);
+                // FULL CLIENT RESET when a new game starts - but don't restart the
+                // music just because another device connected or the state re-sent
+                if (lastAudioTriggerPhase !== 'intro') {
+                    bonusSequenceTriggered = false;
+                    lastProcessedResultId = 0;
+                    stopTimer();
+                    stopCountdown();
+                    lastAudioTriggerPhase = 'intro';
+                    playExclusive('intro', true);
+                }
             }
             
             else if (state.phase === 'idle') {
@@ -598,7 +635,7 @@
                 } else {
                     el.attract.classList.add('dismissed'); 
                     el.ready.classList.add('visible');
-                    el.readyMsg.textContent = "WAITING..."; 
+                    el.readyMsg.textContent = state.tiebreak ? "SUDDEN DEATH" : "WAITING..."; 
                     document.body.className = 'bg-idle';
                     el.mascot.className = 'haggis-art idle';
 
@@ -614,64 +651,60 @@
                 el.ready.classList.remove('visible'); 
                 el.attract.classList.add('dismissed');
                 document.body.className = 'bg-active';
+                el.mainMsg.style.fontSize = "12rem"; 
+                el.subMsg.textContent = "ROUND STARTING"; 
+                el.mascot.className = 'haggis-art panic';
                 
                 if(!currentPhase.includes('countdown')) {
                     lastAudioTriggerPhase = 'countdown';
                     playExclusive('getready');
-                    
-                    let count = 3; 
-                    el.mainMsg.style.fontSize = "12rem"; 
-                    el.mainMsg.textContent = count; 
-                    el.subMsg.textContent = "ROUND STARTING"; 
-                    el.mascot.className = 'haggis-art panic';
-                    
-                    countdownInterval = setInterval(() => { 
-                        count--; 
-                        if(count > 0) el.mainMsg.textContent = count; 
-                    }, 1000);
                 }
+
+                const deadline = state.deadline;
+                const showCount = () => {
+                    const t = secondsLeft(deadline);
+                    if (t > 0) el.mainMsg.textContent = t;
+                };
+                showCount();
+                stopCountdown();
+                countdownInterval = setInterval(showCount, 200);
             }
             
             else if (state.phase === 'active' || state.phase === 'bonus_active') {
+                const isBonus = state.phase === 'bonus_active';
                 el.ready.classList.remove('visible'); 
+                el.attract.classList.add('dismissed');
                 document.body.className = 'bg-active'; 
                 el.mascot.className = 'haggis-art run';
+                el.mainMsg.style.fontSize = "12rem"; 
+                el.subMsg.textContent = "CONSTRUCT WORD";
 
                 if(!currentPhase.includes('active')) {
                     lastAudioTriggerPhase = 'active';
-                    
-                    let time = (state.phase === 'bonus_active') ? 60 : 30; 
-                    el.mainMsg.textContent = time; 
-                    el.mainMsg.style.fontSize = "12rem"; 
-                    el.subMsg.textContent = "CONSTRUCT WORD";
-                    
-                    if(state.phase === 'bonus_active') {
-                        playExclusive('bonusloop', true);
-                    }
-
-                    timerInterval = setInterval(() => {
-                        time--; 
-                        el.mainMsg.textContent = time;
-                        
-                        if(state.phase === 'active') {
-                            if(time > 10) playExclusive('tick');
-                            if(time === 10) {
-                                document.body.className = 'bg-panic'; 
-                                el.mascot.className = 'haggis-art panic'; 
-                                playExclusive('warning'); 
-                                el.mainMsg.style.color = "#ff0000";
-                            }
-                        }
-                        else if(state.phase === 'bonus_active') {
-                            if(time === 10) {
-                                playExclusive('bonuswarn'); 
-                                document.body.className = 'bg-panic'; 
-                                el.mascot.className = 'haggis-art panic'; 
-                                el.mainMsg.style.color = "#ff0000";
-                            }
-                        }
-                    }, 1000);
+                    if(isBonus) playExclusive('bonusloop', true);
                 }
+
+                // Count down to the server's deadline, so a refreshed board shows the right time
+                const deadline = state.deadline;
+                let lastShown = null;
+                const tick = () => {
+                    const t = secondsLeft(deadline);
+                    el.mainMsg.textContent = t;
+                    if (t <= 10) {
+                        document.body.className = 'bg-panic'; 
+                        el.mascot.className = 'haggis-art panic'; 
+                        el.mainMsg.style.color = "#ff0000";
+                    }
+                    if (t === lastShown) return;
+                    const firstRender = lastShown === null;
+                    lastShown = t;
+                    if (firstRender) return;
+                    if (!isBonus && t > 10) playExclusive('tick');
+                    if (t === 10) playExclusive('warning');
+                };
+                tick();
+                stopTimer();
+                timerInterval = setInterval(tick, 200);
             }
             
             else if (state.phase.includes('scanning')) {
@@ -697,10 +730,15 @@
             else if (state.phase.includes('scan_failed')) {
                 document.body.className = 'bg-panic';
                 el.mascot.className = 'haggis-art panic';
-                el.mainMsg.textContent = "MANUAL ENTRY REQUIRED"; 
                 el.mainMsg.style.color = "#ff0000"; 
                 el.mainMsg.style.fontSize = "4rem";
-                el.subMsg.textContent = "CAMERA ERROR / TIMEOUT";
+                if (state.can_retry_scan) {
+                    el.mainMsg.textContent = "SCAN FAILED";
+                    el.subMsg.textContent = "PRESS BUTTON TO RETRY";
+                } else {
+                    el.mainMsg.textContent = "MANUAL ENTRY REQUIRED";
+                    el.subMsg.textContent = "CAMERA ERROR / TIMEOUT";
+                }
                 
                 if(!currentPhase.includes('scan_failed')) {
                     lastAudioTriggerPhase = 'scan_failed';

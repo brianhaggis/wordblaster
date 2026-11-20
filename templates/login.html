@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Station Access - Word Blaster</title>
+    <link rel="apple-touch-icon" href="/static/icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rye&family=Josefin+Slab:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/main.css"/>
+  </head>
+  <body class="home">
+    <div class="container" style="text-align:center;">
+      <main class="card" style="margin-top: 60px; max-width: 420px; margin-left:auto; margin-right:auto;">
+        <h2 style="font-size: 1.5rem; color: var(--deco-brass); border:none; margin-bottom:20px;">STATION ACCESS</h2>
+        <form method="post" action="/login" style="display:flex; flex-direction:column; gap:15px; align-items:center;">
+          <input type="hidden" name="next" value="{{ next_url }}">
+          <input type="password" name="pin" inputmode="numeric" autocomplete="current-password" autofocus
+                 placeholder="PIN"
+                 style="font-size:2rem; text-align:center; width:100%; max-width:240px; padding:10px; letter-spacing:6px;">
+          <button class="btn" type="submit" style="width:100%; max-width:240px;">Enter</button>
+          {% if error %}<p style="color: #ff5555; margin:0;">{{ error }}</p>{% endif %}
+        </form>
+      </main>
+    </div>
+  </body>
+</html>

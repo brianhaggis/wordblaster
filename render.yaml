@@ -3,7 +3,12 @@ services:
     name: wordblaster
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app
+    # One worker: game state lives in memory. Threads handle the live connections.
+    startCommand: gunicorn -w 1 --threads 100 --bind 0.0.0.0:$PORT app:app
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: ADMIN_PIN
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
